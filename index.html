@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流浪地球 - 弹球</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #0a0a1a; }
+        canvas { display: block; }
+        /* Overlay base */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .overlay.show { display: flex; }
+        /* Level Select */
+        #levelSelect h1 {
+            font-size: 48px;
+            color: #4fc3f7;
+            text-shadow: 0 0 20px #4fc3f788, 0 0 40px #4fc3f744;
+            margin-bottom: 40px;
+            letter-spacing: 6px;
+        }
+        #levelSelect .levels {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 600px;
+        }
+        .level-btn {
+            width: 110px;
+            height: 130px;
+            border: 2px solid #4fc3f744;
+            border-radius: 12px;
+            background: rgba(79,195,247,0.08);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .level-btn:hover {
+            background: rgba(79,195,247,0.2);
+            border-color: #4fc3f7;
+            box-shadow: 0 0 25px rgba(79,195,247,0.3);
+            transform: translateY(-4px);
+        }
+        .level-btn .lv-num {
+            font-size: 36px;
+            font-weight: 900;
+            color: #4fc3f7;
+        }
+        .level-btn .lv-name {
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+        }
+        .level-btn .lv-target {
+            font-size: 11px;
+            color: #666;
+        }
+        .level-btn.locked {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        /* Game Over */
+        #gameOver h1 {
+            font-size: 72px;
+            color: #ff4466;
+            text-shadow: 0 0 30px #ff446688, 0 0 60px #ff446644;
+            margin-bottom: 20px;
+            letter-spacing: 8px;
+        }
+        #gameOver .score {
+            font-size: 24px;
+            color: #aaa;
+            margin-bottom: 40px;
+        }
+        /* Level Clear */
+        #levelClear h1 {
+            font-size: 56px;
+            color: #4fc3f7;
+            text-shadow: 0 0 30px #4fc3f788, 0 0 60px #4fc3f744;
+            margin-bottom: 10px;
+            letter-spacing: 6px;
+        }
+        #levelClear .clear-sub {
+            font-size: 22px;
+            color: #aaa;
+            margin-bottom: 40px;
+        }
+        /* Shared buttons */
+        .overlay .btn-row {
+            display: flex;
+            gap: 16px;
+        }
+        .overlay button {
+            padding: 16px 48px;
+            font-size: 22px;
+            border: none;
+            border-radius: 50px;
+            color: #fff;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-restart {
+            background: linear-gradient(135deg, #ff4466, #ff6688);
+            box-shadow: 0 4px 20px rgba(255,68,102,0.4);
+        }
+        .btn-restart:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 30px rgba(255,68,102,0.6);
+        }
+        .btn-next {
+            background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+            box-shadow: 0 4px 20px rgba(79,195,247,0.4);
+        }
+        .btn-next:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 30px rgba(79,195,247,0.6);
+        }
+        .btn-back {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            box-shadow: none;
+        }
+        .btn-back:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+        /* HUD */
+        #hud {
+            position: fixed;
+            top: 0; left: 0; width: 100%;
+            padding: 16px 24px;
+            z-index: 50;
+            pointer-events: none;
+            font-family: 'Segoe UI', sans-serif;
+            display: none;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        #hud .hud-left, #hud .hud-right {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        #hud .hud-level {
+            font-size: 18px;
+            font-weight: 700;
+            color: #4fc3f7;
+            text-shadow: 0 0 10px #4fc3f788;
+        }
+        #hud .hud-name {
+            font-size: 13px;
+            color: #888;
+        }
+        #hud .hud-target {
+            font-size: 15px;
+            color: #aaa;
+        }
+        #hud .hud-target span {
+            color: #4fc3f7;
+            font-weight: 700;
+        }
+        /* Progress bar */
+        .progress-bar {
+            width: 160px;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+            border-radius: 3px;
+            transition: width 0.3s;
+            box-shadow: 0 0 8px #4fc3f788;
+        }
+        /* Level name announcement */
+        #levelAnnounce {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 80;
+            text-align: center;
+            pointer-events: none;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        #levelAnnounce .la-level {
+            font-size: 22px;
+            color: #4fc3f788;
+            letter-spacing: 4px;
+            margin-bottom: 8px;
+        }
+        #levelAnnounce .la-name {
+            font-size: 64px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 30px #4fc3f788, 0 0 60px #4fc3f744;
+            letter-spacing: 10px;
+        }
+        #levelAnnounce .la-target {
+            font-size: 18px;
+            color: #aaa;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- HUD -->
+    <div id="hud" style="display:none;">
+        <div class="hud-left">
+            <div class="hud-level" id="hudLevel">第 1 关</div>
+            <div class="hud-name" id="hudName">刹车时代</div>
+            <div class="hud-target">目标: <span id="hudTarget">1</span> 跳</div>
+            <div class="progress-bar"><div class="progress-fill" id="hudProgress" style="width:0%"></div></div>
+        </div>
+        <div class="hud-right">
+            <div class="hud-target">已跳: <span id="hudBounces">0</span></div>
+        </div>
+    </div>
+    <!-- Level name announcement -->
+    <div id="levelAnnounce">
+        <div class="la-level" id="laLevel">第 1 关</div>
+        <div class="la-name" id="laName">刹车时代</div>
+        <div class="la-target" id="laTarget">目标: 1 跳</div>
+    </div>
+    <!-- Combo Display -->
+    <div id="comboDisplay" style="display:none; position:fixed; top:18%; left:50%; transform:translateX(-50%); text-align:center; z-index:50; pointer-events:none;">
+        <div id="comboText" style="font-family:'Segoe UI',sans-serif; font-size:52px; font-weight:900; letter-spacing:6px; color:#fff; text-shadow:0 0 20px var(--glow-color,#ff68fd),0 0 40px var(--glow-color,#ff68fd),0 0 60px var(--glow-color,#ff68fd); transition:text-shadow 0.3s;"></div>
+        <div id="comboCount" style="font-family:'Segoe UI',sans-serif; font-size:36px; font-weight:700; margin-top:4px; color:#fff; text-shadow:0 0 14px var(--glow-color,#ff68fd),0 0 28px var(--glow-color,#ff68fd); transition:text-shadow 0.3s;"></div>
+    </div>
+    <!-- Level Select -->
+    <div id="levelSelect" class="overlay show"></div>
+    <!-- Level Clear -->
+    <div id="levelClear" class="overlay">
+        <h1>关卡通过</h1>
+        <div class="clear-sub" id="clearSub">刹车时代 完成!</div>
+        <div class="btn-row">
+            <button class="btn-next" id="nextLevelBtn">下一关</button>
+            <button class="btn-back" id="clearBackBtn">关卡选择</button>
+        </div>
+    </div>
+    <!-- Game Over -->
+    <div id="gameOver" class="overlay">
+        <h1>GAME OVER</h1>
+        <div class="score">得分: <span id="finalScore">0</span></div>
+        <div class="btn-row">
+            <button class="btn-next" id="continueBtn">继续</button>
+            <button class="btn-back" id="overBackBtn">返回</button>
+        </div>
+    </div>
+    <!-- Ad Overlay -->
+    <div id="adOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:200; flex-direction:column; align-items:center; justify-content:center;">
+        <div id="adTimer" style="position:absolute; top:20px; right:24px; font-family:'Segoe UI',sans-serif; font-size:28px; font-weight:700; color:#fff; background:rgba(255,68,102,0.8); padding:6px 16px; border-radius:8px;">10</div>
+        <video id="adVideo" style="max-width:80%; max-height:70%;" muted></video>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ========== LEVEL SYSTEM ==========
+        var levels = [
+            { id: 1, name: '刹车时代',    target: 10,   tracks: 'type1',     desc: '只有一个目标' },
+            { id: 2, name: '逃逸时代',    target: 20,   tracks: 'type1_2',   desc: '小心黑洞' },
+            { id: 3, name: '流浪时代',    target: 40,   tracks: 'type1_2_3', desc: '更多挑战' },
+            { id: 4, name: '叛乱时代',    target: 60,   tracks: 'type1_2_3', desc: '漫长的旅途' },
+            { id: 5, name: '新太阳时代',  target: 100,  tracks: 'type1_2_3', desc: '寻找新家园' }
+        ];
+        var currentLevel = null;   // levels[x] object
+        var currentLevelIdx = 0;
+        var unlockedLevel = 0;     // highest unlocked index
+        var levelBounces = 0;      // bounces in current level
+        var playingLevel = false;  // true when in gameplay
+
+        // === UI helpers ===
+        function hideAllOverlays() {
+            document.getElementById('levelSelect').classList.remove('show');
+            document.getElementById('gameOver').classList.remove('show');
+            document.getElementById('levelClear').classList.remove('show');
+        }
+
+        function showLevelSelect() {
+            hideAllOverlays();
+            playingLevel = false;
+            document.getElementById('hud').style.display = 'none';
+            var el = document.getElementById('levelSelect');
+            var html = '<h1>流浪地球</h1><div class="levels">';
+            for (var i = 0; i < levels.length; i++) {
+                var lv = levels[i];
+                var locked = i > unlockedLevel ? ' locked' : '';
+                html += '<div class="level-btn' + locked + '" data-lv="' + i + '">'
+                    + '<div class="lv-num">' + lv.id + '</div>'
+                    + '<div class="lv-name">' + lv.name + '</div>'
+                    + '<div class="lv-target">' + lv.target + ' 跳</div>'
+                    + '</div>';
+            }
+            html += '</div>';
+            el.innerHTML = html;
+            el.classList.add('show');
+            // Bind click
+            var btns = el.querySelectorAll('.level-btn:not(.locked)');
+            btns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    startLevel(parseInt(this.getAttribute('data-lv')));
+                });
+            });
+        }
+
+        function showLevelAnnounce(lv, callback) {
+            var el = document.getElementById('levelAnnounce');
+            document.getElementById('laLevel').textContent = '第 ' + lv.id + ' 关';
+            document.getElementById('laName').textContent = lv.name;
+            document.getElementById('laTarget').textContent = '目标: ' + lv.target + ' 跳';
+            el.style.display = 'block';
+            el.style.opacity = 1;
+            setTimeout(function() {
+                el.style.transition = 'opacity 0.6s';
+                el.style.opacity = 0;
+                setTimeout(function() {
+                    el.style.display = 'none';
+                    el.style.transition = '';
+                    if (callback) callback();
+                }, 600);
+            }, 1500);
+        }
+
+        function updateHUD() {
+            if (!currentLevel) return;
+            document.getElementById('hudLevel').textContent = '第 ' + currentLevel.id + ' 关';
+            document.getElementById('hudName').textContent = currentLevel.name;
+            document.getElementById('hudTarget').textContent = currentLevel.target;
+            document.getElementById('hudBounces').textContent = levelBounces;
+            var pct = Math.min(100, (levelBounces / currentLevel.target) * 100);
+            document.getElementById('hudProgress').style.width = pct + '%';
+        }
+
+        // Level-aware track type
+        function getLevelType() {
+            if (!currentLevel) return 1;
+            var t = currentLevel.tracks;
+            if (t === 'type1') return 1;
+            if (t === 'type1_2') return Math.random() < 0.5 ? 1 : 2;
+            // type1_2_3
+            var r = Math.random();
+            if (r < 0.35) return 1;
+            if (r < 0.7) return 2;
+            return 3;
+        }
+
+        // Start a level
+        function startLevel(idx) {
+            hideAllOverlays();
+            currentLevelIdx = idx;
+            currentLevel = levels[idx];
+            levelBounces = 0;
+            playingLevel = true;
+
+            // Clean up existing game objects
+            cleanupGameObjects();
+
+            // Build tracks for this level
+            buildInitialTracks();
+            initGameState();
+
+            // Show HUD
+            document.getElementById('hud').style.display = 'flex';
+            updateHUD();
+
+            // Announce level name
+            showLevelAnnounce(currentLevel, null);
+        }
+
+        function cleanupGameObjects() {
+            for (var i = 0; i < activeTracks.length; i++) {
+                activeTracks[i].traverse(function(child) {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                });
+                scene.remove(activeTracks[i]);
+            }
+            activeTracks = [];
+            glowList = [];
+            particles = [];
+            for (var ri = 0; ri < ripples.length; ri++) {
+                scene.remove(ripples[ri].mesh);
+                ripples[ri].mesh.geometry.dispose();
+                ripples[ri].mesh.material.dispose();
+            }
+            ripples = [];
+            sinkingBlocks = [];
+            blackHoles = [];
+            // Clean up black hole visuals
+            while (blackHoleGroup.children.length > 0) {
+                var bhChild = blackHoleGroup.children[0];
+                blackHoleGroup.remove(bhChild);
+                bhChild.traverse(function(child) {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                });
+            }
+        }
+
+        // Trigger level clear
+        function triggerLevelClear() {
+            playingLevel = false;
+            var isLast = currentLevelIdx >= levels.length - 1;
+            if (!isLast && currentLevelIdx + 1 > unlockedLevel) {
+                unlockedLevel = currentLevelIdx + 1;
+            }
+            document.getElementById('clearSub').textContent = currentLevel.name + ' 完成!';
+            document.getElementById('nextLevelBtn').style.display = isLast ? 'none' : 'inline-block';
+            // Add black hole to scene
+            addBlackHoleToScene();
+            setTimeout(function() {
+                hideAllOverlays();
+                document.getElementById('levelClear').classList.add('show');
+            }, 1500);
+        }
+
+        // Trigger game over (with level context)
+        function triggerLevelGameOver() {
+            playingLevel = false;
+            document.getElementById('finalScore').textContent = bounceCount;
+            hideCombo();
+            spawnExplosion(ballX, ballY, 0, ballMat.color.clone());
+            sphere.visible = false;
+            // Add black hole to scene
+            addBlackHoleToScene();
+            setTimeout(function() {
+                hideAllOverlays();
+                document.getElementById('gameOver').classList.add('show');
+            }, 1000);
+        }
+
+        // ========== BLACK HOLE SYSTEM ==========
+        var blackHoles = [];
+        var blackHoleGroup = null; // will be created after scene exists
+
+        function addBlackHoleToScene() {
+            // Create black hole at the next track position (will move with tracks)
+            var frontTrack = activeTracks[activeTracks.length - 1];
+            var bhZ = frontTrack ? frontTrack.position.z - CENTER_TO_CENTER * 2 : -20;
+
+            var group = new THREE.Group();
+            group.userData.isBlackHole = true;
+
+            // Core: pure black sphere
+            var coreMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            var core = new THREE.Mesh(new THREE.SphereGeometry(2.5, 32, 32), coreMat);
+            group.add(core);
+
+            // Accretion disk: torus with glow
+            var diskMat = new THREE.MeshBasicMaterial({
+                color: 0xff4466,
+                transparent: true,
+                opacity: 0.6,
+                side: THREE.DoubleSide
+            });
+            var disk = new THREE.Mesh(new THREE.TorusGeometry(4, 0.3, 16, 64), diskMat);
+            disk.rotation.x = Math.PI / 2.5;
+            group.add(disk);
+
+            // Glow ring
+            var glowMat = new THREE.MeshBasicMaterial({
+                color: 0xff6844,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            var glowRing = new THREE.Mesh(new THREE.TorusGeometry(5, 0.8, 16, 64), glowMat);
+            glowRing.rotation.x = Math.PI / 2.5;
+            group.add(glowRing);
+
+            group.position.set(0, 0, bhZ);
+            blackHoleGroup.add(group);
+            blackHoles.push(group);
+        }
+
+        function updateBlackHoles(dt) {
+            // Move black holes toward viewer same as tracks
+            for (var i = 0; i < blackHoles.length; i++) {
+                blackHoles[i].position.z += trackSpeed * dt;
+                // Rotate accretion disk
+                var children = blackHoles[i].children;
+                for (var c = 1; c < children.length; c++) {
+                    children[c].rotation.z += dt * 1.5;
+                }
+                // Check collision with ball
+                if (playingLevel && !gameOver) {
+                    var bhZ = blackHoles[i].position.z;
+                    if (Math.abs(bhZ) < 2) {
+                        var bhX = blackHoles[i].position.x;
+                        var bhY = blackHoles[i].position.y;
+                        var dx = ballX - bhX;
+                        var dy = ballY - bhY;
+                        if (Math.sqrt(dx * dx + dy * dy) < 2.5 + ballRadius) {
+                            triggerLevelGameOver();
+                        }
+                    }
+                }
+            }
+            // Remove old black holes
+            for (var j = blackHoles.length - 1; j >= 0; j--) {
+                if (blackHoles[j].position.z > 20) {
+                    blackHoleGroup.remove(blackHoles[j]);
+                    blackHoles[j].traverse(function(child) {
+                        if (child.isMesh) {
+                            child.geometry.dispose();
+                            child.material.dispose();
+                        }
+                    });
+                    blackHoles.splice(j, 1);
+                }
+            }
+        }
+
+        // ========== BUTTON BINDINGS ==========
+        document.getElementById('continueBtn').addEventListener('click', function() {
+            hideAllOverlays();
+            showAd();
+        });
+        document.getElementById('nextLevelBtn').addEventListener('click', function() {
+            if (currentLevelIdx < levels.length - 1) {
+                startLevel(currentLevelIdx + 1);
+            }
+        });
+        document.getElementById('clearBackBtn').addEventListener('click', function() {
+            showLevelSelect();
+        });
+        document.getElementById('overBackBtn').addEventListener('click', function() {
+            showLevelSelect();
+        });
+
+        // ========== AD SYSTEM ==========
+        var adCountdown = 10;
+        var adInterval = null;
+
+        function showAd() {
+            var adOverlay = document.getElementById('adOverlay');
+            var adTimer = document.getElementById('adTimer');
+            var adVideo = document.getElementById('adVideo');
+
+            adCountdown = 10;
+            adTimer.textContent = adCountdown;
+            adOverlay.style.display = 'flex';
+
+            adVideo.src = 'zhaunzhuan.mp4';
+            adVideo.play().catch(function() {});
+
+            adInterval = setInterval(function() {
+                adCountdown--;
+                adTimer.textContent = adCountdown;
+                if (adCountdown <= 0) {
+                    clearInterval(adInterval);
+                    adInterval = null;
+                    resumeAfterAd();
+                }
+            }, 1000);
+        }
+
+        function resumeAfterAd() {
+            document.getElementById('adOverlay').style.display = 'none';
+            var adVideo = document.getElementById('adVideo');
+            adVideo.pause();
+            adVideo.src = '';
+
+            // Resume game without clearing any data
+            gameOver = false;
+            playingLevel = true;
+            sphere.visible = true;
+            document.getElementById('hud').style.display = 'flex';
+        }
+
+        // ========== SCENE SETUP ==========
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0a0a1a, 0.015);
+
+        // Initialize black hole group now that scene exists
+        blackHoleGroup = new THREE.Group();
+        scene.add(blackHoleGroup);
+        const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3.5, 6);
+        camera.lookAt(0, 0, -8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        // Constants
+        const ballRadius = 1;
+        const trackLen = ballRadius * 2;
+        const trackWidth = ballRadius * 2 * 3;
+
+        // Physics
+        const gravity = -6;
+        const bounceVy = 2;
+        const CENTER_TO_CENTER = 4;
+        const groundY = -2 + 0.05 + ballRadius;
+        var trackSpeed = CENTER_TO_CENTER / (2 * bounceVy / Math.abs(gravity));
+
+        // === Color Palette ===
+        const PINK = new THREE.Color(255/255, 104/255, 253/255);
+        const YELLOW = new THREE.Color(255/255, 229/255, 40/255);
+        const BLUE = new THREE.Color(21/255, 190/255, 252/255);
+        const palette = [PINK, YELLOW, BLUE];
+
+        function randomPaletteIdx() {
+            return Math.floor(Math.random() * 3);
+        }
+
+        // Get current ball color index from ballMat.color
+        function getBallColorIdx() {
+            var bc = ballMat.color;
+            for (var i = 0; i < palette.length; i++) {
+                if (Math.abs(bc.r - palette[i].r) < 0.01 &&
+                    Math.abs(bc.g - palette[i].g) < 0.01 &&
+                    Math.abs(bc.b - palette[i].b) < 0.01) {
+                    return i;
+                }
+            }
+            return 0;
+        }
+
+        // Get a random color index from a track's meshes
+        function getRandomColorIdxFromTrack(trackGroup) {
+            var indices = [];
+            for (var ci = 0; ci < palette.length; ci++) {
+                var pc = palette[ci];
+                trackGroup.traverse(function(child) {
+                    if (child.isMesh && child.material &&
+                        Math.abs(child.material.color.r - pc.r) < 0.01 &&
+                        Math.abs(child.material.color.g - pc.g) < 0.01 &&
+                        Math.abs(child.material.color.b - pc.b) < 0.01) {
+                        if (indices.indexOf(ci) === -1) indices.push(ci);
+                    }
+                });
+            }
+            if (indices.length === 0) return randomPaletteIdx();
+            return indices[Math.floor(Math.random() * indices.length)];
+        }
+
+        // Ball
+        const ballGeo = new THREE.SphereGeometry(ballRadius, 32, 32);
+        const ballInitIdx = randomPaletteIdx();
+        const ballMat = new THREE.MeshStandardMaterial({
+            color: palette[ballInitIdx],
+            metalness: 0.6,
+            roughness: 0.2,
+            emissiveIntensity: 0.3
+        });
+        ballMat.emissive = ballMat.color.clone().multiplyScalar(0.3);
+        const sphere = new THREE.Mesh(ballGeo, ballMat);
+        scene.add(sphere);
+
+        // === Track System ===
+        function makeMaterial(color) {
+            return new THREE.MeshStandardMaterial({
+                color: color,
+                metalness: 0.9,
+                roughness: 0.1,
+                emissive: color.clone().multiplyScalar(0.5),
+                emissiveIntensity: 1.2
+            });
+        }
+
+        function createTrackUnit(type, chainIdx, ballIdx) {
+            // chainIdx: color from previous track (for adjacent color continuity)
+            // ballIdx: ball's fixed color (must be present in this track for safe gameplay)
+            if (chainIdx === undefined || chainIdx < 0 || chainIdx > 2) chainIdx = randomPaletteIdx();
+            if (ballIdx === undefined || ballIdx < 0 || ballIdx > 2) ballIdx = chainIdx;
+            var group = new THREE.Group();
+            group.userData.type = type;
+
+            if (type === 1) {
+                // Type 1: solid bar, changes ball color
+                var mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(trackWidth, 0.1, trackLen),
+                    makeMaterial(palette[chainIdx])
+                );
+                group.add(mesh);
+            } else if (type === 2) {
+                // Type 2: 3 squares at -2, 0, 2. Must include ballIdx + chainIdx for continuity.
+                var squareSize = 1.8;
+                var slotPositions = [-2, 0, 2];
+                // 3 colors: ballIdx (safe), chainIdx (continuity), and the 3rd color
+                var thirdColor;
+                if (chainIdx === ballIdx) {
+                    var others = [0, 1, 2].filter(function(c) { return c !== chainIdx; });
+                    thirdColor = others[Math.floor(Math.random() * others.length)];
+                } else {
+                    thirdColor = [0, 1, 2].filter(function(c) { return c !== chainIdx && c !== ballIdx; })[0];
+                }
+                // Shuffle and assign
+                var colorSet = [chainIdx, ballIdx, thirdColor];
+                colorSet.sort(function() { return Math.random() - 0.5; });
+                for (var i = 0; i < 3; i++) {
+                    var mesh = new THREE.Mesh(
+                        new THREE.BoxGeometry(squareSize, 0.1, squareSize),
+                        makeMaterial(palette[colorSet[i]])
+                    );
+                    mesh.position.x = slotPositions[i];
+                    group.add(mesh);
+                }
+            } else {
+                // Type 3: 2 squares at 2 of [-2, 0, 2]. Must include ballIdx.
+                var squareSize3 = 1.8;
+                var allSlotPos = [-2, 0, 2];
+                // Pick 2 random slots from 3
+                var slotOrder = [0, 1, 2].sort(function() { return Math.random() - 0.5; });
+                var pickA = slotOrder[0], pickB = slotOrder[1];
+                var chosenSlots = [allSlotPos[pickA], allSlotPos[pickB]];
+                // One = ballIdx (safe), other = different color for challenge
+                var otherColor;
+                if (chainIdx !== ballIdx) {
+                    otherColor = chainIdx;
+                } else {
+                    var others3 = [0, 1, 2].filter(function(c) { return c !== ballIdx; });
+                    otherColor = others3[Math.floor(Math.random() * others3.length)];
+                }
+                var colors3 = [ballIdx, otherColor];
+                if (Math.random() < 0.5) { var tmp = colors3[0]; colors3[0] = colors3[1]; colors3[1] = tmp; }
+                var mesh3c = new THREE.Mesh(
+                    new THREE.BoxGeometry(squareSize3, 0.1, squareSize3),
+                    makeMaterial(palette[colors3[0]])
+                );
+                mesh3c.position.x = chosenSlots[0];
+                group.add(mesh3c);
+                var mesh3d = new THREE.Mesh(
+                    new THREE.BoxGeometry(squareSize3, 0.1, squareSize3),
+                    makeMaterial(palette[colors3[1]])
+                );
+                mesh3d.position.x = chosenSlots[1];
+                group.add(mesh3d);
+            }
+
+            return group;
+        }
+
+        // Check if a track contains a specific color index
+        function trackHasColor(trackGroup, colorIdx) {
+            var pc = palette[colorIdx];
+            for (var i = 0; i < trackGroup.children.length; i++) {
+                var child = trackGroup.children[i];
+                if (child.isMesh && child.material &&
+                    Math.abs(child.material.color.r - pc.r) < 0.01 &&
+                    Math.abs(child.material.color.g - pc.g) < 0.01 &&
+                    Math.abs(child.material.color.b - pc.b) < 0.01) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Update a track so it contains the new ball color.
+        // For Type 2/3: replace one square's color with newBallIdx.
+        // For Type 1: change to new color (ball will match it).
+        function updateTrackForNewBallColor(trackGroup, newBallIdx) {
+            if (trackGroup.userData.type === 1) return; // Type 1 is fine, ball already matches it
+            var hasBallColor = trackHasColor(trackGroup, newBallIdx);
+            if (hasBallColor) return; // already safe, no change needed
+
+            // Need to replace one square's color with newBallIdx
+            var pc = palette[newBallIdx];
+            var children = trackGroup.children;
+            // Find the first non-ball-color square and replace it
+            for (var i = 0; i < children.length; i++) {
+                var child = children[i];
+                if (!child.isMesh || !child.material) continue;
+                if (Math.abs(child.material.color.r - pc.r) < 0.01 &&
+                    Math.abs(child.material.color.g - pc.g) < 0.01 &&
+                    Math.abs(child.material.color.b - pc.b) < 0.01) continue;
+                // This square doesn't match ball color — replace it
+                child.material.color.copy(pc);
+                child.material.emissive.copy(pc.clone().multiplyScalar(0.5));
+                return; // done, only replace one
+            }
+        }
+
+        // When ball changes color on Type 1, update all future tracks (ahead of z=0)
+        function updateTracksForNewBallColor(newBallIdx) {
+            for (var i = 0; i < activeTracks.length; i++) {
+                var track = activeTracks[i];
+                if (track.position.z < -0.5) {
+                    // This track is ahead of the ball, ensure it has new ball color
+                    updateTrackForNewBallColor(track, newBallIdx);
+                }
+            }
+        }
+
+        // Pool
+        var poolSize = 25;
+        var freePool = [];
+        var activeTracks = [];
+
+        function getRandomType() {
+            return getLevelType();
+        }
+
+        // Build initial tracks with linked colors
+        function buildInitialTracks() {
+            var startUniform = 5; // first N tracks are same color as ball, all type 1
+            var ballColorIdx = randomPaletteIdx();
+
+            // Set ball color to match initial tracks (ball color is FIXED forever)
+            ballMat.color.copy(palette[ballColorIdx]);
+            ballMat.emissive = palette[ballColorIdx].clone().multiplyScalar(0.3);
+            ballMat.emissiveIntensity = 0.3;
+
+            var prevColor = ballColorIdx;
+            for (var i = 0; i < poolSize; i++) {
+                var type;
+                if (i < startUniform) {
+                    type = 1;
+                } else {
+                    type = getRandomType();
+                }
+                // chainIdx = previous track's color (for visual chain)
+                // ballIdx = ball's fixed color (always present for safe landing)
+                var group = createTrackUnit(type, prevColor, ballColorIdx);
+                group.position.y = -2;
+                group.position.z = -i * CENTER_TO_CENTER;
+                group.visible = true;
+                scene.add(group);
+                activeTracks.push(group);
+                // Chain: pick a random color from this track for the next one
+                prevColor = getRandomColorIdxFromTrack(group);
+            }
+        }
+        // Don't auto-build tracks; level select will call startLevel()
+
+        // Game state
+        var gameOver = false;
+        var deathTimer = 0;
+        var deathDuration = 1.0;
+        var ballX = 0, targetX = 0;
+        var ballY = groundY;
+        var ballVy2 = bounceVy;
+        var bounceCount = 0;
+        var elapsed = 0;
+        var lastTime = performance.now();
+        var glowList = [];
+        var particles = [];
+        var ripples = [];
+        var sinkingBlocks = [];
+        var comboCount = 0;
+        var comboFadeTimer = 0;
+        var comboFadeDuration = 1.2;
+        var comboShowing = false;
+
+        var comboDisplayEl = document.getElementById('comboDisplay');
+        var comboTextEl = document.getElementById('comboText');
+        var comboCountEl = document.getElementById('comboCount');
+
+        function colorToCSS(color) {
+            var r = Math.round(color.r * 255);
+            var g = Math.round(color.g * 255);
+            var b = Math.round(color.b * 255);
+            return 'rgb(' + r + ',' + g + ',' + b + ')';
+        }
+
+        function updateComboDisplay(dt) {
+            if (!comboShowing) return;
+            comboFadeTimer -= dt;
+            if (comboFadeTimer <= 0) {
+                comboDisplayEl.style.display = 'none';
+                comboShowing = false;
+            } else {
+                var fade = Math.min(1, comboFadeTimer / (comboFadeDuration * 0.4));
+                comboDisplayEl.style.opacity = fade;
+            }
+        }
+
+        function showCombo() {
+            comboCount++;
+            var glowCSS = colorToCSS(ballMat.color);
+            comboDisplayEl.style.setProperty('--glow-color', glowCSS);
+            if (!comboShowing) {
+                comboTextEl.textContent = Math.random() < 0.8 ? 'PERFECT' : 'GREAT';
+                comboShowing = true;
+            }
+            comboCountEl.textContent = 'x' + comboCount;
+            comboDisplayEl.style.display = 'block';
+            comboDisplayEl.style.opacity = 1;
+            comboFadeTimer = comboFadeDuration;
+        }
+
+        function hideCombo() {
+            comboDisplayEl.style.display = 'none';
+            comboShowing = false;
+            comboCount = 0;
+        }
+
+        function initGameState() {
+            gameOver = false;
+            deathTimer = 0;
+            ballX = 0;
+            targetX = 0;
+            currentSlot = 1;
+            ballY = groundY;
+            ballVy2 = bounceVy;
+            bounceCount = 0;
+            elapsed = 0;
+            lastTime = performance.now();
+            glowList = [];
+            particles = [];
+            ripples = [];
+            sinkingBlocks = [];
+            // Note: ball color is set by buildInitialTracks, do not override
+            sphere.visible = true;
+            hideAllOverlays();
+        }
+
+        // Keyboard control — instant response, 3 slots matching block positions
+        var slotPositions = [-2, 0, 2];
+        var currentSlot = 1; // ball starts at center (index 1, position 0)
+        var lastMoveTime = 0;
+        var moveInterval = 80; // minimum ms between repeated moves
+
+        document.addEventListener('keydown', function(e) {
+            if (gameOver || !playingLevel) return;
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                var now = performance.now();
+                if (e.repeat && now - lastMoveTime < moveInterval) return;
+                lastMoveTime = now;
+                if (e.key === 'ArrowLeft' && currentSlot > 0) {
+                    currentSlot--;
+                    ballX = slotPositions[currentSlot];
+                } else if (e.key === 'ArrowRight' && currentSlot < 2) {
+                    currentSlot++;
+                    ballX = slotPositions[currentSlot];
+                }
+            }
+        });
+
+        // Particles
+        function spawnExplosion(x, y, z, color) {
+            for (var i = 0; i < 60; i++) {
+                var size = 0.05 + Math.random() * 0.15;
+                var geo = new THREE.SphereGeometry(size, 6, 6);
+                var mat = new THREE.MeshBasicMaterial({
+                    color: color.clone(),
+                    transparent: true, opacity: 1
+                });
+                var mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(x, y, z);
+                var speed = 3 + Math.random() * 6;
+                var theta = Math.random() * Math.PI * 2;
+                var phi = Math.random() * Math.PI;
+                mesh.userData.vx = Math.sin(phi) * Math.cos(theta) * speed;
+                mesh.userData.vy = Math.sin(phi) * Math.sin(theta) * speed + 2;
+                mesh.userData.vz = Math.cos(phi) * speed;
+                mesh.userData.life = 1.0;
+                scene.add(mesh);
+                particles.push(mesh);
+            }
+        }
+
+        function updateParticles(dt) {
+            for (var i = particles.length - 1; i >= 0; i--) {
+                var p = particles[i];
+                p.userData.vy -= 12 * dt;
+                p.position.x += p.userData.vx * dt;
+                p.position.y += p.userData.vy * dt;
+                p.position.z += p.userData.vz * dt;
+                p.userData.life -= dt;
+                p.material.opacity = Math.max(0, p.userData.life);
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    p.geometry.dispose();
+                    p.material.dispose();
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Ripple effect: expanding square outlines at bounce point
+        function spawnRipple(x, y, z, color) {
+            for (var i = 0; i < 3; i++) {
+                var edgeSize = 0.3;
+                var geo = new THREE.EdgesGeometry(
+                    new THREE.BoxGeometry(edgeSize, 0.02, edgeSize)
+                );
+                var mat = new THREE.LineBasicMaterial({
+                    color: color.clone(),
+                    transparent: true,
+                    opacity: 0.8
+                });
+                var mesh = new THREE.LineSegments(geo, mat);
+                mesh.position.set(x, y - 0.5, z);
+                scene.add(mesh);
+                ripples.push({
+                    mesh: mesh,
+                    duration: 0.6,
+                    delay: i * 0.12,
+                    maxScale: 6 + i * 3,
+                    elapsed: 0
+                });
+            }
+        }
+
+        function updateRipples(dt) {
+            for (var i = ripples.length - 1; i >= 0; i--) {
+                var r = ripples[i];
+                r.elapsed += dt;
+
+                if (r.elapsed < r.delay) continue;
+
+                var progress = (r.elapsed - r.delay) / r.duration;
+                if (progress > 1) progress = 1;
+
+                // Uniform scale outward
+                var s = 1 + progress * (r.maxScale - 1);
+                r.mesh.scale.set(s, s, s);
+
+                // Fade out
+                r.mesh.material.opacity = 0.8 * (1 - progress);
+
+                // Slight Y rise
+                r.mesh.position.y += dt * 0.3;
+
+                if (r.elapsed - r.delay >= r.duration) {
+                    scene.remove(r.mesh);
+                    r.mesh.geometry.dispose();
+                    r.mesh.material.dispose();
+                    ripples.splice(i, 1);
+                }
+            }
+        }
+
+        // Sinking block animation: brief Y dip then bounce back
+        function addSinkingBlock(mesh, intensity) {
+            sinkingBlocks.push({
+                mesh: mesh,
+                originalY: mesh.position.y,
+                phase: 0,  // 0=going down, 1=going up, 2=done
+                timer: 0,
+                downDuration: 0.12,
+                upDuration: 0.15,
+                depth: intensity || 0.15
+            });
+        }
+
+        function updateSinkingBlocks(dt) {
+            for (var i = sinkingBlocks.length - 1; i >= 0; i--) {
+                var sb = sinkingBlocks[i];
+                sb.timer += dt;
+
+                if (sb.phase === 0) {
+                    // Sinking down
+                    var t = sb.timer / sb.downDuration;
+                    if (t >= 1) {
+                        t = 1;
+                        sb.phase = 1;
+                        sb.timer = 0;
+                    }
+                    // Ease out (decelerate)
+                    sb.mesh.position.y = sb.originalY - sb.depth * (1 - (1 - t) * (1 - t));
+                } else if (sb.phase === 1) {
+                    // Bouncing back up with slight overshoot
+                    var t2 = sb.timer / sb.upDuration;
+                    if (t2 >= 1) {
+                        t2 = 1;
+                        sb.phase = 2;
+                    }
+                    // Ease out bounce
+                    var bounce = Math.sin(t2 * Math.PI * 0.5);
+                    sb.mesh.position.y = sb.originalY - sb.depth * (1 - bounce);
+                }
+
+                if (sb.phase === 2) {
+                    sb.mesh.position.y = sb.originalY;
+                    sinkingBlocks.splice(i, 1);
+                }
+            }
+        }
+
+        // Check if ball is over any block on this track (no block = miss = death)
+        function checkEmptyMiss(trackGroup) {
+            if (trackGroup.userData.type === 1) return false;
+            var halfBall = ballRadius * 0.5;
+            for (var i = 0; i < trackGroup.children.length; i++) {
+                var child = trackGroup.children[i];
+                if (!child.isMesh) continue;
+                var sqHalfW = child.geometry.parameters.width / 2;
+                var sqWorldX = child.position.x;
+                if (ballX + halfBall > sqWorldX - sqHalfW &&
+                    ballX - halfBall < sqWorldX + sqHalfW) {
+                    return false; // ball is over a block
+                }
+            }
+            return true; // ball is over empty space
+        }
+
+        // Collision: check if ball (on type 2/3) lands on wrong color square
+        function checkSquareCollision(trackGroup) {
+            if (trackGroup.userData.type === 1) return false;
+            var halfBall = ballRadius * 0.8;
+            for (var i = 0; i < trackGroup.children.length; i++) {
+                var child = trackGroup.children[i];
+                if (!child.isMesh) continue;
+                var sqHalfW = child.geometry.parameters.width / 2;
+                var sqWorldX = child.position.x;
+                if (ballX + halfBall > sqWorldX - sqHalfW &&
+                    ballX - halfBall < sqWorldX + sqHalfW) {
+                    var bc = ballMat.color;
+                    var sc = child.material.color;
+                    if (bc.r !== sc.r || bc.g !== sc.g || bc.b !== sc.b) {
+                        return { squareColor: sc };
+                    }
+                }
+            }
+            return false;
+        }
+
+        function triggerGameOver(hitInfo) {
+            gameOver = true;
+            deathTimer = deathDuration;
+            if (hitInfo.squareColor) {
+                spawnExplosion(ballX, ballY, 0, hitInfo.squareColor.clone());
+            }
+            // Use level-aware game over
+            triggerLevelGameOver();
+        }
+
+        // Lighting
+        var dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(3, 8, 5);
+        scene.add(dirLight);
+        var pointLight = new THREE.PointLight(0x4fc3f7, 2, 20);
+        pointLight.position.set(0, 3, 0);
+        scene.add(pointLight);
+        var ambientLight = new THREE.AmbientLight(0x1a1a3e, 0.8);
+        scene.add(ambientLight);
+
+        // Ground glow
+        var glowPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(3, 200),
+            new THREE.MeshBasicMaterial({ color: 0x0a0a2a, transparent: true, opacity: 0.3 })
+        );
+        glowPlane.rotation.x = -Math.PI / 2;
+        glowPlane.position.set(0, -2.1, -80);
+        scene.add(glowPlane);
+
+        // Animate
+        function animate() {
+            requestAnimationFrame(animate);
+            var now = performance.now();
+            var dt = (now - lastTime) / 1000;
+            lastTime = now;
+            if (dt > 0.05) dt = 0.05;
+            elapsed += dt;
+
+            // Ball Y physics (only when playing)
+            if (playingLevel && !gameOver) {
+                ballVy2 += gravity * dt;
+                ballY += ballVy2 * dt;
+            }
+
+            // Move tracks toward viewer (only when playing)
+            if (playingLevel) {
+                for (var i = 0; i < activeTracks.length; i++) {
+                    activeTracks[i].position.z += trackSpeed * dt;
+                }
+            }
+
+            // Bounce
+            if (!gameOver && playingLevel && ballY <= groundY) {
+                ballY = groundY;
+                ballVy2 = bounceVy;
+                bounceCount++;
+                levelBounces++;
+                updateHUD();
+
+                // Find closest track to z=0
+                var closestTrack = null;
+                var closestDist = Infinity;
+                for (var j = 0; j < activeTracks.length; j++) {
+                    var d = Math.abs(activeTracks[j].position.z);
+                    if (d < closestDist) {
+                        closestDist = d;
+                        closestTrack = activeTracks[j];
+                    }
+                }
+
+                if (closestTrack) {
+                    closestTrack.position.z = 0;
+
+                    // Check empty miss first (ball over no block)
+                    if (checkEmptyMiss(closestTrack)) {
+                        triggerGameOver({});
+                    } else {
+                        var hitInfo = checkSquareCollision(closestTrack);
+                        if (hitInfo) {
+                            triggerGameOver(hitInfo);
+                        } else {
+                            showCombo();
+                            // Type 1: change ball color
+                            if (closestTrack.userData.type === 1 && closestTrack.children[0]) {
+                                var tm = closestTrack.children[0].material;
+                                ballMat.color.copy(tm.color);
+                                ballMat.emissive.copy(tm.emissive);
+                                // Update all future tracks to include new ball color
+                                updateTracksForNewBallColor(getBallColorIdx());
+                            }
+                            // Glow + ripple + sink animation
+                            closestTrack.traverse(function(child) {
+                                if (child.isMesh && child.material) {
+                                    child.material.emissiveIntensity = 3.0;
+                                    glowList.push({ mat: child.material, timer: 0.35 });
+                                    addSinkingBlock(child, 0.15);
+                                }
+                            });
+                            var bounceColor = closestTrack.children[0] ? closestTrack.children[0].material.color : ballMat.color;
+                            spawnRipple(ballX, groundY - 0.95, 0, bounceColor);
+
+                            // Check level clear condition
+                            if (currentLevel && levelBounces >= currentLevel.target) {
+                                triggerLevelClear();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Update glow
+            for (var g = glowList.length - 1; g >= 0; g--) {
+                glowList[g].timer -= dt;
+                var t = Math.max(0, glowList[g].timer / 0.35);
+                if (glowList[g].mat) {
+                    glowList[g].mat.emissiveIntensity = 1.2 + 1.8 * t;
+                }
+                if (glowList[g].timer <= 0) {
+                    glowList.splice(g, 1);
+                }
+            }
+
+            // Idle pulse
+            for (var k = 0; k < activeTracks.length; k++) {
+                if (!activeTracks[k].visible) continue;
+                activeTracks[k].traverse(function(child) {
+                    if (child.isMesh && child.material) {
+                        var glowing = false;
+                        for (var gl = 0; gl < glowList.length; gl++) {
+                            if (glowList[gl].mat === child.material) { glowing = true; break; }
+                        }
+                        if (!glowing) {
+                            child.material.emissiveIntensity = 0.6 + Math.sin(elapsed * 3 + activeTracks[k].position.z * 0.5) * 0.3;
+                        }
+                    }
+                });
+            }
+
+            // Camera
+            camera.position.set(0, 3.5, 6);
+            camera.lookAt(0, 0, -8);
+
+            // Ball X position is now discrete, controlled by keydown events
+
+            // Effects
+            pointLight.position.set(ballX, ballY + 2, 0);
+            pointLight.intensity = 1.5 + Math.sin(elapsed * 5) * 0.5;
+
+            // Add new track ahead (only when playing)
+            if (playingLevel) {
+                var frontTrack = activeTracks[activeTracks.length - 1];
+                if (frontTrack && frontTrack.position.z > -50) {
+                    var newType = getRandomType();
+                    var chainIdx = getRandomColorIdxFromTrack(frontTrack);
+                    var ballIdx = getBallColorIdx();
+                    var newGroup = createTrackUnit(newType, chainIdx, ballIdx);
+                    newGroup.position.y = -2;
+                    newGroup.position.z = frontTrack.position.z - CENTER_TO_CENTER;
+                    newGroup.visible = true;
+                    scene.add(newGroup);
+                    activeTracks.push(newGroup);
+                }
+            }
+
+            // Recycle old tracks
+            while (activeTracks.length > 0 && activeTracks[0].position.z > 20) {
+                var old = activeTracks.shift();
+                old.traverse(function(child) {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                });
+                scene.remove(old);
+            }
+
+            // Death (overlay shown by triggerLevelGameOver)
+            if (gameOver) {
+                deathTimer -= dt;
+            }
+
+            // Update particles
+            updateParticles(dt);
+            updateRipples(dt);
+            updateSinkingBlocks(dt);
+            updateComboDisplay(dt);
+            updateBlackHoles(dt);
+
+            // Ball position
+            if (!gameOver) {
+                sphere.position.set(ballX, ballY, 0);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize: show level select
+        showLevelSelect();
+        animate();
+    </script>
+</body>
+</html>
